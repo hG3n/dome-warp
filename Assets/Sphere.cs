@@ -6,7 +6,6 @@ public class Sphere : MonoBehaviour
     private Vector3 _center;
     private float _epsilon = 0.00001f;
 
-
     private void Start()
     {
          
