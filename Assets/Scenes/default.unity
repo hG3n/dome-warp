@@ -196,7 +196,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 382604998}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -232,7 +232,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _diameter: 200
-  _position: {x: 0, y: 200, z: 0}
+  _position: {x: 0, y: 900, z: 0}
 --- !u!4 &458206268
 Transform:
   m_ObjectHideFlags: 0
@@ -286,11 +286,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 647124401}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dbe8d2908b7830f4d9371bc194be8d97, type: 3}
+  m_Script: {fileID: 11500000, guid: 23fd0172efe2b9d4e9224fbac6e9df7f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _position: {x: 0, y: 60, z: 0}
+  _position: {x: 0, y: 50, z: 0}
   _angles: {x: 0, y: 0, z: 0}
+  _sample_x: 512
+  _sample_y: 288
 --- !u!1 &793126714
 GameObject:
   m_ObjectHideFlags: 0
@@ -388,7 +390,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _diameter: 80
-  _position: {x: 0, y: 80, z: 170}
+  _position: {x: 0, y: 900, z: 170}
 --- !u!4 &1575786281
 Transform:
   m_ObjectHideFlags: 0
