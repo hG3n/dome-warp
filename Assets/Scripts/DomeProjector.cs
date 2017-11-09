@@ -1,31 +1,31 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Xml.Schema;
-using NUnit.Framework.Constraints;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
-using UnityEngine.SceneManagement;
-using UnityEngine.UI;
-using UnityEngine.WSA;
-using UnityEngine.XR.WSA.Persistence;
+using Debug = UnityEngine.Debug;
 using Ray = UnityEngine.Ray;
 
 public class DomeProjector : MonoBehaviour {
 
     [Header("Projector stats (cm) (deg)")]
 
-    // publics
+    // stats
     public Vector3 _position;
     public Vector3 _angles;
-    public int _sample_x;
-    public int _sample_y;
+
+    [Header("Samplesize")]
+
+    // samplepoints
+    public int _sampleX;
+    public int _sampleY;
 
     // privates
     private Camera _camera;
     private Vector3[] _frustum_corners_world = new Vector3[4];
     private Vector3[,] _sample_points;
+    private Dictionary<Vector2, Vector2> _screen_to_dome;
+
+    private int _hits = 0;
+    private int _total_samplepoints = 0;
 
     private void Awake() {
         // set position & angles
@@ -36,7 +36,8 @@ public class DomeProjector : MonoBehaviour {
         _camera = GetComponentInChildren<Camera>();
 
         // initialize sample points 
-        _sample_points = new Vector3[_sample_y, _sample_x];
+        _sample_points = new Vector3[_sampleY, _sampleX];
+        _total_samplepoints = _sampleY * _sampleX;
     }
 
     /// <summary>
@@ -60,9 +61,24 @@ public class DomeProjector : MonoBehaviour {
         _clearDebugPrimitives();
         calculateFrustumCorners();
         calculateFrustumBorders();
-        performRaycast();
+        performRaycast(true);
     }
 
+    /// <summary>
+    /// display information on screen
+    /// </summary>
+    private void OnGUI() {
+        
+        // print stats
+        GUI.Label(new Rect(10, 20, 200, 20), ("Total Samplepoints:" + _total_samplepoints.ToString()));
+        GUI.Label(new Rect(10, 40, 200, 20), ("Total Dome hits:   " + _hits.ToString()));
+        GUI.Label(new Rect(10, 60, 200, 20), ("Hit Percentage:    " + (_hits * 100 / _total_samplepoints).ToString() ));
+        
+    }
+
+    /// <summary>
+    /// calculate corner points of the current view frustum
+    /// </summary>
     private void calculateFrustumCorners() {
 
         Vector3[] frustum_corners_obj = new Vector3[4];
@@ -73,7 +89,7 @@ public class DomeProjector : MonoBehaviour {
         for (int i = 0; i < frustum_corners_obj.Length; i++) {
             var corner_ws = _camera.transform.TransformVector(frustum_corners_obj[i]);
             _frustum_corners_world[i] = corner_ws;
-            Debug.DrawRay(transform.position, _frustum_corners_world[i], Color.magenta, Time.deltaTime);
+//            Debug.DrawRay(transform.position, _frustum_corners_world[i], Color.magenta, Time.deltaTime);
         }
 
     }
@@ -84,22 +100,23 @@ public class DomeProjector : MonoBehaviour {
     /// </summary>
     private void calculateFrustumBorders(bool debug = false) {
 
+        // calculate frustum line
         Line3D top_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[2]);
         Line3D left_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[0]);
         Line3D right_frustum_border = new Line3D(_frustum_corners_world[2], _frustum_corners_world[3]);
 
         // define sample distance
-        float sample_distance_x = top_frustum_border.length / (_sample_x - 1);
-        float sample_distance_y = left_frustum_border.length / (_sample_y - 1);
+        float sample_distance_x = top_frustum_border.length / (_sampleX - 1);
+        float sample_distance_y = left_frustum_border.length / (_sampleY - 1);
 
         // for each vertical distance construct new horizontal line
         // sample along each horizontal line to get the final amount of points
-        for (int r = 0; r < _sample_y; r++) {
+        for (int r = 0; r < _sampleY; r++) {
             Vector3 point_y_l = left_frustum_border.getPointOnLine(sample_distance_y * r);
             Vector3 point_y_r = right_frustum_border.getPointOnLine(sample_distance_y * r);
             Line3D line_horizontal = new Line3D(point_y_l, point_y_r);
 
-            for (int c = 0; c < _sample_x; c++) {
+            for (int c = 0; c < _sampleX; c++) {
                 Vector3 point = line_horizontal.getPointOnLine(sample_distance_x * c);
                 point += transform.position;
                 if (debug) {
@@ -108,38 +125,65 @@ public class DomeProjector : MonoBehaviour {
                 _sample_points[r, c] = point;
             }
         }
+        
     }
 
     /// <summary>
     /// cast a ray for each samplepoint 
     /// </summary>
-    private void performRaycast() {
+    private void performRaycast(bool debug = false) {
 
+        _hits = 0;
+        // for each samplepoint perform a raycast to determine the reflection into the mirror
         for (int r = 0; r < _sample_points.GetLength(0); r++) {
             for (int c = 0; c < _sample_points.GetLength(1); c++) {
 
+                // calculate raycast direction
                 var direction = _sample_points[r, c] - transform.position;
-//                Debug.DrawRay(transform.position, direction, Color.black, Time.deltaTime);
 
+                // perform initial raycast
                 RaycastHit hit;
                 Ray ray = new Ray(transform.position, direction);
                 if (Physics.Raycast(ray, out hit, 100.0f)) {
-                    Debug.DrawRay(transform.position, hit.point - transform.position, Color.red, Time.deltaTime);
-                    reflectRay(hit.point, hit.normal);
+                    // fuck this visualization
+                    if (debug) {
+                        Debug.DrawRay(transform.position, hit.point - transform.position, Color.red, Time.deltaTime);
+                    }
+
+                    // reflect ray
+                    bool has_hit = reflectRay(direction, hit);
+                    if (has_hit) {
+                        ++_hits;
+                    }
                 }
+
             }
         }
 
     }
 
-    private void reflectRay(Vector3 reflection_point, Vector3 normal) {
-        Vector3 direction = Vector3.Reflect(reflection_point, normal);
-        Ray ray = new Ray(reflection_point, direction);
+    /// <summary>
+    /// reflect ray along the input direction
+    /// </summary>
+    /// <param name="reflection_point"></param>
+    /// <param name="normal"></param>
+    private bool reflectRay(Vector3 in_direction, RaycastHit mirror_hitpoint) {
+
+        // calculate out direction
+        Vector3 out_direction = Vector3.Reflect(in_direction, mirror_hitpoint.normal);
+
+        // create new ray and perform raycast
+        Ray ray = new Ray(mirror_hitpoint.point, out_direction);
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit, 100.0f)) {
-            Debug.DrawRay(reflection_point, hit.point + -transform.position, Color.blue, Time.deltaTime);
+//            Debug.DrawRay(mirror_hitpoint.point, hit.point + mirror_hitpoint.point);
+            _createNewSphere(hit.point, 0.05f);
+            return true;
         }
+
+        return false;
     }
+
 
     /// <summary>
     /// debug function to create new sphere
@@ -150,6 +194,7 @@ public class DomeProjector : MonoBehaviour {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         go.transform.position = pos;
         go.transform.localScale = new Vector3(scale, scale, scale);
+        go.GetComponent<SphereCollider>().enabled = false;
         go.tag = "DebugPrimitive";
     }
 
