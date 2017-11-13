@@ -9,7 +9,11 @@ public class ApplicationController : MonoBehaviour {
 
     private UserInterface _user_interface;
     private bool _canvas_enabled;
-    
+    private Camera _main_camera;
+
+    private void Awake() {
+        _main_camera = Camera.main;
+    }
 
     // Use this for initialization
     void Start() {
@@ -23,7 +27,7 @@ public class ApplicationController : MonoBehaviour {
         if (Input.GetKeyUp(KeyCode.U)) {
             hideMenu();
         }
-        
+
     }
 
     private void hideMenu() {

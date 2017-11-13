@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using NUnit.Framework.Constraints;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 using Ray = UnityEngine.Ray;
 
@@ -20,15 +22,23 @@ public class DomeProjector : MonoBehaviour {
     public int _sampleX;
     public int _sampleY;
 
+    [Header("Prefabs")]
+
+    // prefabs
+    public GameObject _proxyGeometry;
+
     // privates
     private Camera _camera;
     private Vector3[] _frustum_corners_world = new Vector3[4];
     private Vector3[,] _sample_points;
     private Dictionary<Vector2, Vector3> _screen_to_dome;
 
-    private int _hits = 0;
-    private int _total_samplepoints = 0;
+    private int _hits;
+    private int _total_samplepoints;
 
+    /// <summary>
+    /// on awake lifecycle hook
+    /// </summary>
     private void Awake() {
         // set position & angles
         transform.position = _position / 100.0f;
@@ -36,6 +46,9 @@ public class DomeProjector : MonoBehaviour {
 
         // get camera
         _camera = GetComponentInChildren<Camera>();
+
+        // initialize variables
+        _hits = 0;
 
         // initialize sample points 
         _sample_points = new Vector3[_sampleY, _sampleX];
@@ -56,10 +69,9 @@ public class DomeProjector : MonoBehaviour {
     }
 
     /// <summary>
-    /// framewise update
+    /// fixed time interval update
     /// </summary>
-    /// <exception cref="NotImplementedException"></exception>
-    private void Update() {
+    private void FixedUpdate() {
         _clearDebugPrimitives();
         calculateFrustumCorners();
         calculateFrustumBorders();
@@ -72,9 +84,14 @@ public class DomeProjector : MonoBehaviour {
     private void OnGUI() {
 
         // print stats
-        GUI.Label(new Rect(10, 20, 200, 20), ("Total Samplepoints:" + _total_samplepoints.ToString()));
-        GUI.Label(new Rect(10, 40, 200, 20), ("Total Dome hits:   " + _hits.ToString()));
-        GUI.Label(new Rect(10, 60, 200, 20), ("Hit Percentage:    " + (_hits * 100 / _total_samplepoints).ToString()));
+        string str = ("Total Samplepoints:" + _total_samplepoints.ToString());
+        GUI.Label(new Rect(20, 1000, 200, 20), str);
+
+        str = ("Total Dome hits:   " + _hits.ToString());
+        GUI.Label(new Rect(20, 1020, 200, 20), str);
+
+        str = (("Hit Percentage:    " + _hits * 100 / _total_samplepoints).ToString());
+        GUI.Label(new Rect(20, 1040, 200, 20), str);
 
     }
 
@@ -193,7 +210,10 @@ public class DomeProjector : MonoBehaviour {
         if (Physics.Raycast(ray, out hit, 100.0f)) {
 //            Debug.DrawRay(mirror_hitpoint.point, hit.point + mirror_hitpoint.point);
             final_hitpoint = hit.point;
-            _createNewSphere(hit.point, 0.05f);
+
+            _createProxyGeometry(hit.point);
+
+//            _createNewSphere(hit.point, 0.05f);
             return true;
         }
 
@@ -211,9 +231,24 @@ public class DomeProjector : MonoBehaviour {
     private void _createNewSphere(Vector3 pos, float scale = 0.5f) {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         go.GetComponent<SphereCollider>().enabled = false;
+
+        // get renderer
+        Renderer r = go.GetComponent<Renderer>();
+
+        // create new material
+        Material m = new Material(Shader.Find("Unlit/Color"));
+        m.color = Color.red;
+
+        // assign material 
+        r.material = m;
+
         go.transform.position = pos;
         go.transform.localScale = new Vector3(scale, scale, scale);
         go.tag = "DebugPrimitive";
+    }
+
+    private void _createProxyGeometry(Vector3 pos) {
+        Instantiate(_proxyGeometry, pos, new Quaternion());
     }
 
 
@@ -226,4 +261,22 @@ public class DomeProjector : MonoBehaviour {
             Destroy(debug_spheres[i]);
         }
     }
+
+    /// <summary>
+    /// get number of hits with the dome
+    /// </summary>
+    /// <returns></returns>
+    public int getNumHits() {
+        return _hits;
+    }
+
+    /// <summary>
+    /// get total amount of sample points
+    /// </summary>
+    /// <returns></returns>
+    public int getTotalPointCount() {
+        return _total_samplepoints;
+    }
+
+
 }

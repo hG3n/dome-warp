@@ -536,8 +536,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4313853526dc6c4eae749ead03a7788, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _diameter: 200
-  _position: {x: 0, y: 200, z: 0}
+  _diameter: 320
+  _position: {x: 0, y: 140, z: 0}
 --- !u!4 &458206268
 Transform:
   m_ObjectHideFlags: 0
@@ -594,10 +594,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23fd0172efe2b9d4e9224fbac6e9df7f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _position: {x: 0, y: 0, z: 0}
+  _position: {x: 0, y: 0, z: 100}
   _angles: {x: 0, y: 0, z: 0}
   _sampleX: 32
   _sampleY: 18
+  _proxyGeometry: {fileID: 1270754686825850, guid: 29350153402b73b44a543f4f72a07a9b,
+    type: 2}
 --- !u!1 &653241930 stripped
 GameObject:
   m_PrefabParentObject: {fileID: 100002, guid: 63f0ad79fd033b4498e7009090f09102, type: 3}
@@ -1346,7 +1348,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1522110255}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -39, y: 5.861111, z: 9.6481495}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}

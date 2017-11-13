@@ -18,7 +18,7 @@ public class Dome : MonoBehaviour{
     /// </summary>
     void Start(){
         // determine scale
-        float scale = _diameter / 100.0f;
+        float scale = (_diameter / 2) / 100.0f;
         transform.localScale = new Vector3(scale, scale, scale);
 
         // setup position
