@@ -4,24 +4,24 @@ using UnityEngine;
 
 public class ApplicationController : MonoBehaviour {
 
-    public DomeProjector DomeProjector;
+    // publics
     public Canvas _ui;
 
+    // privates
     private UserInterface _user_interface;
     private bool _canvas_enabled;
-    private Camera _main_camera;
 
-    private void Awake() {
-        _main_camera = Camera.main;
-    }
-
-    // Use this for initialization
+    /// <summary>
+    /// init function
+    /// </summary>
     void Start() {
         _canvas_enabled = _ui.enabled;
         _user_interface = _ui.GetComponent<UserInterface>();
     }
 
-    // Update is called once per frame
+    /// <summary>
+    /// framewise update
+    /// </summary>
     void Update() {
         // ui trigger
         if (Input.GetKeyUp(KeyCode.U)) {
@@ -30,6 +30,9 @@ public class ApplicationController : MonoBehaviour {
 
     }
 
+    /// <summary>
+    /// hide menu
+    /// </summary>
     private void hideMenu() {
         if (_canvas_enabled) {
             _user_interface.hide();

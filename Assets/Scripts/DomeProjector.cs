@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Channels;
+using System.Threading;
 using NUnit.Framework.Constraints;
 using UnityEngine;
+using UnityEngine.Assertions.Must;
 using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
@@ -26,6 +29,7 @@ public class DomeProjector : MonoBehaviour {
 
     // prefabs
     public GameObject _proxyGeometry;
+    public GameObject _sphere;
 
     // privates
     private Camera _camera;
@@ -72,10 +76,24 @@ public class DomeProjector : MonoBehaviour {
     /// fixed time interval update
     /// </summary>
     private void FixedUpdate() {
-        _clearDebugPrimitives();
-        calculateFrustumCorners();
-        calculateFrustumBorders();
-        performRaycast();
+//        _clearDebugPrimitives();
+//        calculateFrustumCorners();
+//        calculateFrustumBorders();
+//        performRaycast();
+    }
+
+    /// <summary>
+    /// framewise update
+    /// </summary>
+    private void Update() {
+
+        if (Input.GetKeyDown(KeyCode.Space)) {
+            calculateFrustumCorners();
+            calculateFrustumBorders();
+            performRaycast();
+            projectHitpointsToPlane();
+        }
+
     }
 
     /// <summary>
@@ -211,7 +229,7 @@ public class DomeProjector : MonoBehaviour {
 //            Debug.DrawRay(mirror_hitpoint.point, hit.point + mirror_hitpoint.point);
             final_hitpoint = hit.point;
 
-            _createProxyGeometry(hit.point);
+//            _createProxyGeometry(hit.point);
 
 //            _createNewSphere(hit.point, 0.05f);
             return true;
@@ -247,6 +265,10 @@ public class DomeProjector : MonoBehaviour {
         go.tag = "DebugPrimitive";
     }
 
+    /// <summary>
+    /// create new proxy geometry at given position
+    /// </summary>
+    /// <param name="pos"></param>
     private void _createProxyGeometry(Vector3 pos) {
         Instantiate(_proxyGeometry, pos, new Quaternion());
     }
@@ -262,20 +284,46 @@ public class DomeProjector : MonoBehaviour {
         }
     }
 
+
     /// <summary>
-    /// get number of hits with the dome
+    /// project each hitpoint to a plane
     /// </summary>
-    /// <returns></returns>
-    public int getNumHits() {
-        return _hits;
+    public void projectHitpointsToPlane() {
+
+        // delete
+        var hitpoint_spheres = GameObject.FindGameObjectsWithTag("HitpointSphere");
+        for (int i = 0; i < hitpoint_spheres.Length; i++) {
+            Destroy(hitpoint_spheres[i]);
+        }
+        
+        // project each hitpoint to a certain y value
+        foreach (var pair in _screen_to_dome) {
+            Vector2 screen_corrd = pair.Key;
+            Vector3 dome_coord = pair.Value;
+            Vector3 new_coord = new Vector3(dome_coord.x, 3.0f, dome_coord.z);
+            Instantiate(_sphere, new_coord, new Quaternion());
+        }
+
     }
 
     /// <summary>
-    /// get total amount of sample points
+    /// change y position using slider callback
     /// </summary>
-    /// <returns></returns>
-    public int getTotalPointCount() {
-        return _total_samplepoints;
+    /// <param name="new_value"></param>
+    public void changeYPosition(float new_value) {
+        transform.position = new Vector3(transform.position.x, new_value, transform.position.z);
+    }
+
+    public void changeXPosition(float new_value) {
+        transform.position = new Vector3(new_value, transform.position.y, transform.position.z);
+    }
+
+    public void changeZPosition(float new_value) {
+        transform.position = new Vector3(transform.position.x, transform.position.y, new_value);
+    }
+
+    public void changeXAngle(float new_value) {
+        transform.eulerAngles = new Vector3(new_value, transform.eulerAngles.y, transform.eulerAngles.z);
     }
 
 
