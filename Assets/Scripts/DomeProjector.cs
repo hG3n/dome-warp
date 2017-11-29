@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Remoting.Channels;
-using System.Threading;
-using NUnit.Framework.Constraints;
+﻿using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
-using UnityEngine.EventSystems;
-using UnityEngine.Networking;
-using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 using Ray = UnityEngine.Ray;
 
@@ -35,7 +28,9 @@ public class DomeProjector : MonoBehaviour {
     private Camera _camera;
     private Vector3[] _frustum_corners_world = new Vector3[4];
     private Vector3[,] _sample_points;
-    private Dictionary<Vector2, Vector3> _screen_to_dome;
+    private Dictionary<Vector3, Vector3> _screen_to_dome;
+    private List<Vector3> _normalized_screen_points = new List<Vector3>();
+    private List<Vector3> _normalized_dome_plane_points = new List<Vector3>();
 
     private int _hits;
     private int _total_samplepoints;
@@ -72,26 +67,29 @@ public class DomeProjector : MonoBehaviour {
         calculateFrustumBorders();
     }
 
-    /// <summary>
-    /// fixed time interval update
-    /// </summary>
-    private void FixedUpdate() {
-//        _clearDebugPrimitives();
-//        calculateFrustumCorners();
-//        calculateFrustumBorders();
-//        performRaycast();
-    }
 
     /// <summary>
     /// framewise update
     /// </summary>
     private void Update() {
 
+        calculateFrustumCorners();
+        calculateFrustumBorders();
+
         if (Input.GetKeyDown(KeyCode.Space)) {
             calculateFrustumCorners();
             calculateFrustumBorders();
-            performRaycast();
+            performRaycast(true);
             projectHitpointsToPlane();
+
+            saveToFile();
+        }
+
+        if (Input.GetKeyDown(KeyCode.C)) {
+            var hitpoint_spheres = GameObject.FindGameObjectsWithTag("HitpointSphere");
+            for (int i = 0; i < hitpoint_spheres.Length; i++) {
+                Destroy(hitpoint_spheres[i]);
+            }
         }
 
     }
@@ -126,8 +124,7 @@ public class DomeProjector : MonoBehaviour {
         for (int i = 0; i < frustum_corners_obj.Length; i++) {
             var corner_ws = _camera.transform.TransformVector(frustum_corners_obj[i]);
             _frustum_corners_world[i] = corner_ws;
-
-//            Debug.DrawRay(transform.position, _frustum_corners_world[i], Color.magenta, Time.deltaTime);
+            Debug.DrawRay(transform.position, _frustum_corners_world[i], Color.magenta, Time.deltaTime);
         }
 
     }
@@ -173,14 +170,19 @@ public class DomeProjector : MonoBehaviour {
     private void performRaycast(bool debug = false) {
 
         _hits = 0;
-        Dictionary<Vector2, Vector3> screen_dome_coord_map = new Dictionary<Vector2, Vector3>();
+        Dictionary<Vector3, Vector3> screen_dome_coord_map = new Dictionary<Vector3, Vector3>();
 
         // for each samplepoint perform a raycast to determine the reflection into the mirror
         for (int r = 0; r < _sample_points.GetLength(0); r++) {
+            float r_mapped = mapToRange(r, 0.0f, _sampleY -1, 0.0f, 1.0f);
+
             for (int c = 0; c < _sample_points.GetLength(1); c++) {
+                float c_mapped = mapToRange(c, 0.0f, _sampleX -1, 0.0f, 1.0f);
 
                 // calculate raycast direction
                 var direction = _sample_points[r, c] - transform.position;
+
+//                Debug.DrawRay(transform.position, direction,  Color.green, 100.0f);
 
                 // perform initial raycast
                 RaycastHit hit;
@@ -188,7 +190,8 @@ public class DomeProjector : MonoBehaviour {
                 if (Physics.Raycast(ray, out hit, 100.0f)) {
                     // fuck this visualization
                     if (debug) {
-                        Debug.DrawRay(transform.position, hit.point - transform.position, Color.red, Time.deltaTime);
+//                        Debug.DrawRay(transform.position, hit.point - transform.position, Color.red, Time.deltaTime);
+//                        Debug.DrawRay(transform.position, hit.point - transform.position, Color.red, 100.0f);
                     }
 
                     // reflect ray and gather final dome hitpoint
@@ -197,11 +200,23 @@ public class DomeProjector : MonoBehaviour {
                     if (has_hit) {
 
                         // save mapping 
-                        screen_dome_coord_map.Add(new Vector2(r, c), dome_hitpoint);
+                        var dome_plane_point = new Vector3(dome_hitpoint.x, 0.0f, dome_hitpoint.z);
+                        screen_dome_coord_map.Add(new Vector3(r_mapped, c_mapped, 1.0f), dome_plane_point);
+                        _normalized_dome_plane_points.Add(dome_plane_point);
+                        _normalized_screen_points.Add(new Vector3(r_mapped, c_mapped, 1.0f));
+
 
                         // increase hit counter
                         ++_hits;
                     }
+                    else {
+                        screen_dome_coord_map.Add(new Vector3(r_mapped, c_mapped, 0.0f), new Vector3());
+                        _normalized_screen_points.Add(new Vector3(r_mapped, c_mapped, 0.0f));
+                    }
+                }
+                else {
+                    screen_dome_coord_map.Add(new Vector3(r_mapped, c_mapped, 0.0f), new Vector3());
+                    _normalized_screen_points.Add(new Vector3(r_mapped, c_mapped, 0.0f));
                 }
 
             }
@@ -215,8 +230,10 @@ public class DomeProjector : MonoBehaviour {
     /// <summary>
     /// reflect ray along the input direction
     /// </summary>
-    /// <param name="reflection_point"></param>
-    /// <param name="normal"></param>
+    /// <param name="in_direction"></param>
+    /// <param name="mirror_hitpoint"></param>
+    /// <param name="final_hitpoint"></param>
+    /// <returns></returns>
     private bool reflectRay(Vector3 in_direction, RaycastHit mirror_hitpoint, out Vector3 final_hitpoint) {
 
         // calculate out direction
@@ -228,10 +245,6 @@ public class DomeProjector : MonoBehaviour {
         if (Physics.Raycast(ray, out hit, 100.0f)) {
 //            Debug.DrawRay(mirror_hitpoint.point, hit.point + mirror_hitpoint.point);
             final_hitpoint = hit.point;
-
-//            _createProxyGeometry(hit.point);
-
-//            _createNewSphere(hit.point, 0.05f);
             return true;
         }
 
@@ -268,7 +281,7 @@ public class DomeProjector : MonoBehaviour {
     /// <summary>
     /// create new proxy geometry at given position
     /// </summary>
-    /// <param name="pos"></param>
+    /// <param name="pos">position to create the proxy geometry</param>
     private void _createProxyGeometry(Vector3 pos) {
         Instantiate(_proxyGeometry, pos, new Quaternion());
     }
@@ -295,7 +308,7 @@ public class DomeProjector : MonoBehaviour {
         for (int i = 0; i < hitpoint_spheres.Length; i++) {
             Destroy(hitpoint_spheres[i]);
         }
-        
+
         // project each hitpoint to a certain y value
         foreach (var pair in _screen_to_dome) {
             Vector2 screen_corrd = pair.Key;
@@ -303,6 +316,53 @@ public class DomeProjector : MonoBehaviour {
             Vector3 new_coord = new Vector3(dome_coord.x, 3.0f, dome_coord.z);
             Instantiate(_sphere, new_coord, new Quaternion());
         }
+
+    }
+
+
+    /// <summary>
+    /// map value to given range
+    /// </summary>
+    /// <param name="value">value to map</param>
+    /// <param name="in_min">min value of input range</param>
+    /// <param name="in_max">max value of input range</param>
+    /// <param name="out_min">min value of output range</param>
+    /// <param name="out_max">max value of ouput range</param>
+    /// <returns></returns>
+    float mapToRange(float value, float in_min, float in_max, float out_min, float out_max) {
+        return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
+
+    private void saveToFile() {
+
+        string filepath = "Assets/Output/mask.txt";
+        StreamWriter writer = new StreamWriter(filepath, false);
+
+        foreach (var point in _normalized_screen_points) {
+            var pointstring = point.x + " " + point.y + " " + point.z;
+            writer.WriteLine(pointstring);
+        }
+        writer.Close();
+
+        filepath = "Assets/Output/normalized_dome_plane_points.txt";
+        writer = new StreamWriter(filepath, false);
+        foreach (var point in _normalized_dome_plane_points) {
+            // we leave out the y coordinate since its set to zero anyway
+            var pointstring = point.x + " " + point.z;
+            writer.WriteLine(pointstring);
+        }
+        writer.Close();
+
+
+        filepath = "Assets/Output/screen_to_dome.txt";
+        writer = new StreamWriter(filepath, false);
+        foreach (KeyValuePair<Vector3, Vector3> pair in _screen_to_dome) {
+            var str = pair.Key.x + " " + pair.Key.y + " " + pair.Key.z + " | " + pair.Value.x + " " + pair.Value.y +
+                      " " + pair.Value.z;
+            writer.WriteLine(str);
+        }
+        writer.Close();
+
 
     }
 
