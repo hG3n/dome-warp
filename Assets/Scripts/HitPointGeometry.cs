@@ -8,8 +8,9 @@ public class HitPointGeometry : MonoBehaviour {
     
     void Start() {
         _camera = Camera.main;
-        transform.LookAt(transform.position + _camera.transform.rotation * Vector3.forward,
-            _camera.transform.rotation * Vector3.up);
+        transform.up = (transform.position - _camera.transform.position).normalized;
+
+//        transform.LookAt();
     }
     
 }
