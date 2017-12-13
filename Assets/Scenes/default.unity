@@ -1413,6 +1413,16 @@ Prefab:
       propertyPath: _previewObject
       value: 
       objectReference: {fileID: 747180230}
+    - target: {fileID: 114977312105919242, guid: 10b9e2caf70e7664fbcbd984ac784eac,
+        type: 2}
+      propertyPath: _numRings
+      value: 360
+      objectReference: {fileID: 0}
+    - target: {fileID: 114977312105919242, guid: 10b9e2caf70e7664fbcbd984ac784eac,
+        type: 2}
+      propertyPath: _numRingPoints
+      value: 720
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 10b9e2caf70e7664fbcbd984ac784eac, type: 2}
   m_IsPrefabParent: 0

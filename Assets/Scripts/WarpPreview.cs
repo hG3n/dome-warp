@@ -32,7 +32,7 @@ public class WarpPreview : MonoBehaviour {
     /// </summary>
     public void inititalize(List<Vector3> tex_coords, List<Vector3> screen_points) {
 
-        // clear alll elements first
+        // clear all elements first
         var proxy_geos = GameObject.FindGameObjectsWithTag("DebugPrimitive");
         for (int i = 0; i < proxy_geos.Length; i++) {
             Destroy(proxy_geos[i]);
