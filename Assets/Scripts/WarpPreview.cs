@@ -99,8 +99,6 @@ public class WarpPreview : MonoBehaviour {
         // get renderer
         Renderer r = _proxyGeometry.GetComponent<Renderer>();
 
-        Debug.Log("renderer: " + r);
-
         // create new material
         Material m = new Material(Shader.Find("Unlit/Color"));
         m.color = clr;
