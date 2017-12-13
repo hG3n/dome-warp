@@ -82,7 +82,7 @@ Transform:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1781675165069356}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 4459095761348972}
@@ -201,8 +201,14 @@ MonoBehaviour:
   _angles: {x: 0, y: 0, z: 0}
   _sampleX: 32
   _sampleY: 18
-  _proxyGeometry: {fileID: 1121024164095402, guid: 29350153402b73b44a543f4f72a07a9b,
+  _numRings: 180
+  _numRingPoints: 360
+  _numDomeRings: 18
+  _numDomeRingPoints: 36
+  _proxyGeometry: {fileID: 1871255471623478, guid: a2dc3dd24e9fcfd4ebbc64e056badc25,
     type: 2}
+  _dome: {fileID: 1983641534285760, guid: 7308859306370df4093b9d91f37c970b, type: 2}
+  _previewObject: {fileID: 0}
 --- !u!124 &124458780235431280
 Behaviour:
   m_ObjectHideFlags: 1

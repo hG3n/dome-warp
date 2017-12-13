@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Permissions;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 using Ray = UnityEngine.Ray;
+
 
 public class DomeProjector : MonoBehaviour {
     [Header("Projector stats (cm) (deg)")]
@@ -26,7 +28,6 @@ public class DomeProjector : MonoBehaviour {
     public int _numRings;
     public int _numRingPoints;
 
-
     [Header("Dome Sample Size")]
 
     // something
@@ -38,9 +39,10 @@ public class DomeProjector : MonoBehaviour {
     // prefabs
     public GameObject _proxyGeometry;
     public GameObject _dome;
+    public GameObject _previewObject;
 
     // enums
-    private enum Axis {
+    public enum Axis {
         X,
         Y,
         Z
@@ -48,12 +50,15 @@ public class DomeProjector : MonoBehaviour {
 
     // privates
     private Camera _camera;
+    private WarpPreview _warp_preview;
     private int _hits;
     private int _total_samplepoints;
     private Vector3[] _frustum_corners_world = new Vector3[4];
     private List<Vector3> _dome_hitpoints_rad;
     private List<Vector3> _screen_points_rad;
-    private Dictionary<Vector3, Vector3> _screen_to_dome;
+
+    private List<Vector3> _normalized_screen_points;
+    private List<Vector3> _normalized_texture_coordinates;
 
     /// <summary>
     /// on awake lifecycle hook
@@ -71,6 +76,9 @@ public class DomeProjector : MonoBehaviour {
 
         // initialize sample points 
         _total_samplepoints = _sampleY * _sampleX;
+
+        _warp_preview = _previewObject.GetComponent<WarpPreview>();
+        
     }
 
     /// <summary>
@@ -101,6 +109,10 @@ public class DomeProjector : MonoBehaviour {
         // clear all debut primitives
         if (Input.GetKeyDown(KeyCode.C)) {
             _clearDebugPrimitives();
+        }
+
+        if (Input.GetKeyDown(KeyCode.P)) {
+            _warp_preview.togglePreview();
         }
     }
 
@@ -136,7 +148,7 @@ public class DomeProjector : MonoBehaviour {
         }
 
         // perform radial raycast
-        performRadialRaycast();
+        performRaycast();
 
         // create green list here
         Dictionary<int, int> map = new Dictionary<int, int>();
@@ -163,8 +175,11 @@ public class DomeProjector : MonoBehaviour {
             screen_points.Add(_screen_points_rad[pair.Value]);
         }
 
+        // normalize 
         List<Vector3> texture_coords_normalized = normalizeHitpointList(texture_points);
+        _normalized_texture_coordinates = texture_coords_normalized;
         List<Vector3> screen_points_normalized = normalizeScreenPointList(screen_points);
+        _normalized_screen_points = screen_points_normalized;
 
        
         // append meta info to lists
@@ -173,23 +188,14 @@ public class DomeProjector : MonoBehaviour {
         screen_points_normalized.Add(
             new Vector3(_numDomeRings, _numDomeRingPoints, screen_points_normalized.Count));
 
-        
-        Debug.Log("texture corrds length: " + texture_coords_normalized.Count);
-        Debug.Log("screen corrd length: " + screen_points_normalized.Count);
-        
-        foreach (Vector3 coord in texture_coords_normalized) {
-            _createDebugPrimitive(coord, Color.red, 0.03f);
-        }
-        foreach (Vector3 vector3 in screen_points_normalized) {
-            _createDebugPrimitive(vector3, Color.blue, 0.03f);
-        }
-//        
 
         // save to file
         savePointListToFile(texture_coords_normalized, "Assets/Output/texture_coords.txt");
         savePointListToFile(screen_points_normalized, "Assets/Output/mesh.txt");
         
         Debug.Log("You dun know!");
+        
+        _warp_preview.inititalize(texture_coords_normalized, screen_points_normalized);
     }
 
 
@@ -198,17 +204,17 @@ public class DomeProjector : MonoBehaviour {
     /// </summary>
     /// <returns>The point list.</returns>
     private List<Vector3> normalizeScreenPointList(List<Vector3> list) {
-        float min_x = findMinAxisValue(list, Axis.X);
-        float max_x = findMaxAxisValue(list, Axis.X);
+        float min_x = Utility.findMinAxisValue(list, Axis.X);
+        float max_x = Utility.findMaxAxisValue(list, Axis.X);
 
-        float min_y = findMinAxisValue(list, Axis.Y);
-        float max_y = findMaxAxisValue(list, Axis.Y);
+        float min_y = Utility.findMinAxisValue(list, Axis.Y);
+        float max_y = Utility.findMaxAxisValue(list, Axis.Y);
 
         // map values to new range
         List<Vector3> normalized_list = new List<Vector3>();
         foreach (Vector3 vec in list) {
-            float new_x = mapToRange(vec.x, min_x, max_x, -1.0f, 1.0f);
-            float new_z = mapToRange(vec.y, min_y, max_y, -1.0f, 1.0f);
+            float new_x = Utility.mapToRange(vec.x, min_x, max_x, -1.0f, 1.0f);
+            float new_z = Utility.mapToRange(vec.y, min_y, max_y, -1.0f, 1.0f);
             normalized_list.Add(new Vector3(new_x, 0.0f, new_z));
         }
 
@@ -221,85 +227,24 @@ public class DomeProjector : MonoBehaviour {
     /// </summary>
     /// <returns>The point list.</returns>
     private List<Vector3> normalizeHitpointList(List<Vector3> list) {
-        float min_x = findMinAxisValue(list, Axis.X);
-        float max_x = findMaxAxisValue(list, Axis.X);
+        float min_x = Utility.findMinAxisValue(list, Axis.X);
+        float max_x = Utility.findMaxAxisValue(list, Axis.X);
 
-        float min_z = findMinAxisValue(list, Axis.Z);
-        float max_z = findMaxAxisValue(list, Axis.Z);
+        float min_z = Utility.findMinAxisValue(list, Axis.Z);
+        float max_z = Utility.findMaxAxisValue(list, Axis.Z);
 
         // map values to new range
         List<Vector3> normalized_list = new List<Vector3>();
         foreach (Vector3 vec in list) {
-            float new_x = mapToRange(vec.x, min_x, max_x, 0.0f, 1.0f);
-            float new_z = mapToRange(vec.z, min_z, max_z, 0.0f, 1.0f);
+            float new_x = Utility.mapToRange(vec.x, min_x, max_x, 0.0f, 1.0f);
+            float new_z = Utility.mapToRange(vec.z, min_z, max_z, 0.0f, 1.0f);
             normalized_list.Add(new Vector3(new_x, 0.0f, new_z));
         }
 
         return normalized_list;
     }
 
-
-    /// <summary>
-    /// find minimum value of axis in a list of vectors
-    /// </summary>
-    /// <param name="list"></param>
-    /// <param name="axis"></param>
-    /// <returns>smallest list element by axis</returns>
-    private float findMinAxisValue(List<Vector3> list, Axis axis) {
-        float smallest = float.MaxValue;
-        foreach (Vector3 point in list) {
-            float current_value = 0.0f;
-            switch (axis) {
-                case Axis.X:
-                    current_value = point.x;
-                    break;
-                case Axis.Y:
-                    current_value = point.y;
-                    break;
-                case Axis.Z:
-                    current_value = point.z;
-                    break;
-            }
-
-            if (current_value < smallest) {
-                smallest = current_value;
-            }
-        }
-
-        return smallest;
-    }
-
-    /// <summary>
-    /// find minimum value of axis in a list of vectors
-    /// </summary>
-    /// <param name="list"></param>
-    /// <param name="axis"></param>
-    /// <returns>greatest list element by axis</returns>
-    private float findMaxAxisValue(List<Vector3> list, Axis axis) {
-        float greatest = float.MinValue;
-        for (int i = 0; i < list.Count; ++i) {
-            float current_value = 0.0f;
-            switch (axis) {
-                case Axis.X:
-                    current_value = list[i].x;
-                    break;
-                case Axis.Y:
-                    current_value = list[i].y;
-                    break;
-                case Axis.Z:
-                    current_value = list[i].z;
-                    break;
-            }
-
-            if (current_value > greatest) {
-                greatest = current_value;
-            }
-        }
-
-        return greatest;
-    }
-
-
+    
     /// <summary>
     /// calculate corner points of the current view frustum
     /// </summary>
@@ -316,39 +261,7 @@ public class DomeProjector : MonoBehaviour {
         }
     }
 
-
-    /// <summary>
-    /// calculate the frustum borders
-    /// </summary>
-    private List<RectangularSamplePoint> calculateSamplePointGrid(bool debug = false) {
-        // calculate frustum borders
-        Line3D top_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[2]);
-        Line3D left_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[0]);
-        Line3D right_frustum_border = new Line3D(_frustum_corners_world[2], _frustum_corners_world[3]);
-
-        // define sample distance
-        float sample_distance_x = top_frustum_border.length / (_sampleX - 1);
-        float sample_distance_y = left_frustum_border.length / (_sampleY - 1);
-
-        // for each vertical distance construct new horizontal line
-        // sample along each horizontal line to get the final amount of points
-        List<RectangularSamplePoint> sample_points_rect = new List<RectangularSamplePoint>();
-        for (int r = 0; r < _sampleY; r++) {
-            Vector3 point_y_l = left_frustum_border.getPointOnLine(sample_distance_y * r);
-            Vector3 point_y_r = right_frustum_border.getPointOnLine(sample_distance_y * r);
-            Line3D line_horizontal = new Line3D(point_y_l, point_y_r);
-
-            for (int c = 0; c < _sampleX; c++) {
-                Vector3 point = line_horizontal.getPointOnLine(sample_distance_x * c);
-                point += transform.position;
-
-                RectangularSamplePoint rsp = new RectangularSamplePoint(point, c, r);
-                sample_points_rect.Add(rsp);
-            }
-        }
-
-        return sample_points_rect;
-    }
+ 
 
 
     /// <summary>
@@ -356,7 +269,7 @@ public class DomeProjector : MonoBehaviour {
     /// </summary>
     /// <param name="direction"></param>
     /// <returns></returns>
-    private List<Vector3> createRadialGrid(Axis direction) {
+    private List<Vector3> generateRadialGrid(Axis direction) {
         Vector3[] fc = _frustum_corners_world;
 
         float step_size = 0;
@@ -437,9 +350,9 @@ public class DomeProjector : MonoBehaviour {
     /// <summary>
     /// perform raycast using the radial grid
     /// </summary>
-    private void performRadialRaycast() {
+    private void performRaycast() {
         // create radial grid
-        List<Vector3> radial_points = createRadialGrid(Axis.X);
+        List<Vector3> radial_points = generateRadialGrid(Axis.X);
 
         // transform radial grid back to projector space
         for (int i = 0; i < radial_points.Count; i++) {
@@ -494,7 +407,6 @@ public class DomeProjector : MonoBehaviour {
         Ray ray = new Ray(mirror_hitpoint.point, out_direction);
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit, 100.0f)) {
-            //            Debug.DrawRay(mirror_hitpoint.point, hit.point + mirror_hitpoint.point);
             final_hitpoint = hit.point;
             return true;
         }
@@ -510,12 +422,11 @@ public class DomeProjector : MonoBehaviour {
     /// </summary>
     /// <param name="pos"></param>
     /// <param name="scale"></param>
-    private void _createDebugPrimitive(Vector3 pos, Color clr, float scale = 0.5f) {
+    private void _createDebugPrimitive(Vector3 pos, Color clr) {
 
         // get renderer
         Renderer r = _proxyGeometry.GetComponent<Renderer>();
         
-         // create new material
         // create new material
         Material m = new Material(Shader.Find("Unlit/Color"));
         m.color = clr;
@@ -523,6 +434,7 @@ public class DomeProjector : MonoBehaviour {
         // assign material 
         r.material = m;
 
+        // assign tag and instantiate
         _proxyGeometry.tag = "DebugPrimitive";
         Instantiate(_proxyGeometry, pos, new Quaternion());
     }
@@ -536,20 +448,6 @@ public class DomeProjector : MonoBehaviour {
         for (int i = 0; i < debug_spheres.Length; i++) {
             Destroy(debug_spheres[i]);
         }
-    }
-
-
-    /// <summary>
-    /// map value to given range
-    /// </summary>
-    /// <param name="value">value to map</param>
-    /// <param name="in_min">min value of input range</param>
-    /// <param name="in_max">max value of input range</param>
-    /// <param name="out_min">min value of output range</param>
-    /// <param name="out_max">max value of ouput range</param>
-    /// <returns></returns>
-    float mapToRange(float value, float in_min, float in_max, float out_min, float out_max) {
-        return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
     }
 
 
@@ -569,46 +467,55 @@ public class DomeProjector : MonoBehaviour {
 
         writer.Close();
     }
-}
-
-public class RectangularSamplePoint {
-    private Vector3 _position;
-    private int _idx_x;
-    private int _idx_y;
-
+    
+    
     /// <summary>
-    /// c'tor
+    /// calculate the frustum borders
     /// </summary>
-    /// <param name="position"></param>
-    /// <param name="idx_x"></param>
-    /// <param name="idx_y"></param>
-    public RectangularSamplePoint(Vector3 position, int idx_x, int idx_y) {
-        _position = position;
-        _idx_x = idx_x;
-        _idx_y = idx_y;
+    private List<RectSamplePoint> calculateSamplePointGrid(bool debug = false) {
+        // calculate frustum borders
+        Line3D top_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[2]);
+        Line3D left_frustum_border = new Line3D(_frustum_corners_world[1], _frustum_corners_world[0]);
+        Line3D right_frustum_border = new Line3D(_frustum_corners_world[2], _frustum_corners_world[3]);
+
+        // define sample distance
+        float sample_distance_x = top_frustum_border.length / (_sampleX - 1);
+        float sample_distance_y = left_frustum_border.length / (_sampleY - 1);
+
+        // for each vertical distance construct new horizontal line
+        // sample along each horizontal line to get the final amount of points
+        List<RectSamplePoint> sample_points_rect = new List<RectSamplePoint>();
+        for (int r = 0; r < _sampleY; r++) {
+            Vector3 point_y_l = left_frustum_border.getPointOnLine(sample_distance_y * r);
+            Vector3 point_y_r = right_frustum_border.getPointOnLine(sample_distance_y * r);
+            Line3D line_horizontal = new Line3D(point_y_l, point_y_r);
+
+            for (int c = 0; c < _sampleX; c++) {
+                Vector3 point = line_horizontal.getPointOnLine(sample_distance_x * c);
+                point += transform.position;
+
+                RectSamplePoint rsp = new RectSamplePoint(point, c, r);
+                sample_points_rect.Add(rsp);
+            }
+        }
+
+        return sample_points_rect;
     }
 
     /// <summary>
-    /// position getter
+    /// texture coord getter
     /// </summary>
     /// <returns></returns>
-    public Vector3 getPosition() {
-        return _position;
+    public List<Vector3> getNormalizedTextureCoords() {
+        return _normalized_texture_coordinates;
     }
 
     /// <summary>
-    /// x-index getter
+    /// screen point getter
     /// </summary>
     /// <returns></returns>
-    public int getXIndex() {
-        return _idx_x;
+    public List<Vector3> getNormalizedScreenPoints() {
+        return _normalized_screen_points;
     }
-
-    /// <summary>
-    /// y-index getter
-    /// </summary>
-    /// <returns></returns>
-    public int getYIndex() {
-        return _idx_y;
-    }
+    
 }
